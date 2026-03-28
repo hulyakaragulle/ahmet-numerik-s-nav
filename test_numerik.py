@@ -453,3 +453,153 @@ class TestPdfYukleyici:
         txt.write_text("içerik")
         with pytest.raises(ValueError):
             pdf_yukle(str(txt))
+
+
+# ===========================================================================
+# YOL HARİTASI
+# ===========================================================================
+
+class TestYolHaritasi:
+    """yol_haritasi modülünün birim testleri."""
+
+    KAPSAMLI_METIN = (
+        "Newton-Raphson yöntemi ile kök bulma. İkiye bölme ve sekant yöntemi. "
+        "Gauss eliminasyonu ile lineer sistem çözümü. LU ayrıştırma. "
+        "Lagrange interpolasyonu. Küpsel spline. "
+        "Yamuk ve Simpson integrali. Gauss-Legendre. "
+        "Euler ve RK4 yöntemi ile ODE çözümü. "
+        "Hata analizi, mutlak hata, bağıl hata, yuvarlama hatası."
+    )
+
+    # --- konulari_tespit ---
+
+    def test_tespit_hata_analizi(self):
+        from yol_haritasi import konulari_tespit
+        eslesmeler = konulari_tespit("mutlak hata ve yuvarlama hatası")
+        assert "hata_analizi" in eslesmeler
+
+    def test_tespit_kok_bulma(self):
+        from yol_haritasi import konulari_tespit
+        eslesmeler = konulari_tespit("Newton-Raphson ve sekant yöntemi")
+        assert "kok_bulma" in eslesmeler
+
+    def test_tespit_lineer_sistemler(self):
+        from yol_haritasi import konulari_tespit
+        eslesmeler = konulari_tespit("Gauss eliminasyonu ile matris çözümü")
+        assert "lineer_sistemler" in eslesmeler
+
+    def test_tespit_interpolasyon(self):
+        from yol_haritasi import konulari_tespit
+        eslesmeler = konulari_tespit("Lagrange interpolasyonu ve spline")
+        assert "interpolasyon" in eslesmeler
+
+    def test_tespit_turev_integral(self):
+        from yol_haritasi import konulari_tespit
+        eslesmeler = konulari_tespit("Yamuk ve Simpson integral kuralı")
+        assert "turev_integral" in eslesmeler
+
+    def test_tespit_diferansiyel_denklemler(self):
+        from yol_haritasi import konulari_tespit
+        eslesmeler = konulari_tespit("Euler ve RK4 yöntemi ODE çözümü")
+        assert "diferansiyel_denklemler" in eslesmeler
+
+    def test_tespit_ozedeger(self):
+        from yol_haritasi import konulari_tespit
+        eslesmeler = konulari_tespit("Güç iterasyonu ile özdeğer hesabı eigenvalue")
+        assert "ozedeger" in eslesmeler
+
+    def test_tespit_bos_metin(self):
+        from yol_haritasi import konulari_tespit
+        eslesmeler = konulari_tespit("")
+        assert eslesmeler == {}
+
+    def test_tespit_esleme_sayisi_pozitif(self):
+        from yol_haritasi import konulari_tespit
+        eslesmeler = konulari_tespit("Newton Newton Newton sekant")
+        assert eslesmeler.get("kok_bulma", 0) >= 3
+
+    # --- yol_haritasi_olustur ---
+
+    def test_olustur_bos_metin_bos_liste(self):
+        from yol_haritasi import yol_haritasi_olustur
+        harita = yol_haritasi_olustur(metin="xyz alakasız metin")
+        assert harita == []
+
+    def test_olustur_adim_sayisi(self):
+        from yol_haritasi import yol_haritasi_olustur
+        harita = yol_haritasi_olustur(metin=self.KAPSAMLI_METIN)
+        assert len(harita) >= 5
+
+    def test_olustur_tum_konular(self):
+        from yol_haritasi import yol_haritasi_olustur, KONU_GRAFIGI
+        harita = yol_haritasi_olustur(tum_konular=True)
+        assert len(harita) == len(KONU_GRAFIGI)
+
+    def test_olustur_onkosul_sirasi(self):
+        """Önkoşullar her zaman ilgili konudan önce gelmeli."""
+        from yol_haritasi import yol_haritasi_olustur
+        harita = yol_haritasi_olustur(tum_konular=True)
+        adim_sirasi = {a["konu_id"]: a["adim"] for a in harita}
+        for adim in harita:
+            for onkosul in adim["onkosullar"]:
+                if onkosul in adim_sirasi:
+                    assert adim_sirasi[onkosul] < adim["adim"]
+
+    def test_olustur_sozluk_anahtarlari(self):
+        from yol_haritasi import yol_haritasi_olustur
+        harita = yol_haritasi_olustur(metin="mutlak hata Newton sekant")
+        beklenen = {"adim", "konu_id", "ad", "aciklama", "sure_saat",
+                    "zorluk", "onkosullar", "esleme_sayisi"}
+        for adim in harita:
+            assert beklenen.issubset(adim.keys())
+
+    def test_olustur_txt_dosyasindan(self, tmp_path):
+        from yol_haritasi import yol_haritasi_olustur
+        txt = tmp_path / "ders.txt"
+        txt.write_text("Newton-Raphson kök bulma. Gauss eliminasyonu.", encoding="utf-8")
+        harita = yol_haritasi_olustur(dosyalar=[str(txt)])
+        konu_idler = [a["konu_id"] for a in harita]
+        assert "kok_bulma" in konu_idler or "lineer_sistemler" in konu_idler
+
+    def test_olustur_olmayan_dosya(self):
+        from yol_haritasi import yol_haritasi_olustur
+        with pytest.raises(FileNotFoundError):
+            yol_haritasi_olustur(dosyalar=["/tmp/yok_dosya_xyz.txt"])
+
+    def test_olustur_pdf_dosyasindan(self, tmp_path):
+        from yol_haritasi import yol_haritasi_olustur
+        # PDF ile aynı yardımcıyı kullan
+        pdf_yolu = _ornek_pdf_olustur(["Newton-Raphson kok bulma Gauss eliminasyonu"])
+        try:
+            harita = yol_haritasi_olustur(dosyalar=[pdf_yolu])
+            konu_idler = [a["konu_id"] for a in harita]
+            assert "kok_bulma" in konu_idler or "lineer_sistemler" in konu_idler
+        finally:
+            if os.path.exists(pdf_yolu):
+                os.unlink(pdf_yolu)
+
+    # --- yol_haritasi_yazdir ---
+
+    def test_yazdir_bos_harita(self, capsys):
+        from yol_haritasi import yol_haritasi_yazdir
+        yol_haritasi_yazdir([])
+        cikti = capsys.readouterr().out
+        assert "tespit edilemedi" in cikti
+
+    def test_yazdir_cikti_iceriyor(self, capsys):
+        from yol_haritasi import yol_haritasi_olustur, yol_haritasi_yazdir
+        harita = yol_haritasi_olustur(metin="Newton sekant hata yuvarlama")
+        yol_haritasi_yazdir(harita)
+        cikti = capsys.readouterr().out
+        assert "YOL HARİTASI" in cikti
+        assert "Adım" in cikti
+
+    def test_yazdir_dosyaya_kaydediyor(self, tmp_path):
+        from yol_haritasi import yol_haritasi_olustur, yol_haritasi_yazdir
+        harita = yol_haritasi_olustur(tum_konular=True)
+        cikti_dosya = str(tmp_path / "harita.txt")
+        yol_haritasi_yazdir(harita, dosyaya=cikti_dosya)
+        assert os.path.exists(cikti_dosya)
+        with open(cikti_dosya, encoding="utf-8") as f:
+            icerik = f.read()
+        assert "YOL HARİTASI" in icerik

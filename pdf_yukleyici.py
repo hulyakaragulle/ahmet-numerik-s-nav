@@ -291,6 +291,7 @@ def _cli():
             "  python pdf_yukleyici.py ders.pdf --ara Newton\n"
             "  python pdf_yukleyici.py ders.pdf --kaydet\n"
             "  python pdf_yukleyici.py ders.pdf --sayfa 3\n"
+            "  python pdf_yukleyici.py ders.pdf --yol-haritasi\n"
         ),
     )
     parser.add_argument("dosya", help="İşlenecek PDF dosyasının yolu")
@@ -302,6 +303,8 @@ def _cli():
                         help="PDF metnini .txt dosyasına kaydet")
     parser.add_argument("--sayfa", type=int, metavar="N",
                         help="Yalnızca N. sayfayı göster (1 tabanlı)")
+    parser.add_argument("--yol-haritasi", action="store_true",
+                        help="PDF içeriğini analiz edip çalışma yol haritası oluştur")
 
     args = parser.parse_args()
 
@@ -327,6 +330,12 @@ def _cli():
     if args.sayfa is not None:
         metin = pdf_sayfa_getir(args.dosya, args.sayfa)
         print(f"\n--- Sayfa {args.sayfa} ---\n{metin}")
+        return
+
+    if args.yol_haritasi:
+        from yol_haritasi import yol_haritasi_olustur, yol_haritasi_yazdir
+        harita = yol_haritasi_olustur(dosyalar=[args.dosya])
+        yol_haritasi_yazdir(harita)
         return
 
     # Varsayılan: tüm PDF'i yükle ve ilk sayfayı göster

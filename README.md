@@ -25,8 +25,9 @@ pip install -r requirements.txt
 | `hata_analizi.py` | **Hata Analizi** | Mutlak/Bağıl Hata · Taylor Serisi · Yuvarlama · Hata Yayılımı |
 | `ozedeger.py` | **Özdeğer** | Güç İterasyonu · Ters Güç İterasyonu · NumPy doğrulama |
 | `pdf_yukleyici.py` | **PDF Yükleyici** | Büyük PDF yükleme · Sayfa getirme · Anahtar kelime arama · Metin kaydetme |
+| `yol_haritasi.py` | **Yol Haritası** | Ders içeriği analizi · Konu tespiti · Önkoşul sıralaması · Çalışma planı |
 | `demo.py` | **Demo** | Tüm modülleri çalıştırır ve sonuçları karşılaştırır |
-| `test_numerik.py` | **Testler** | 49 birim testi (pytest) |
+| `test_numerik.py` | **Testler** | 69 birim testi (pytest) |
 
 ---
 
@@ -182,6 +183,82 @@ pdf_kaydet("ders.pdf", "ders_metni.txt")
 
 ---
 
+## 🗺️ Çalışma Yol Haritası Üreteci (`yol_haritasi.py`)
+
+Ders PDF'lerini veya metin dosyalarını analiz ederek içerikteki konuları
+tespit eder ve **önkoşul bağımlılıklarına** göre sıralanmış bir çalışma
+planı oluşturur. Harici bir API gerekmez; tamamen çevrimdışı çalışır.
+
+### Komut Satırı (CLI) Kullanımı
+
+```bash
+# Tek PDF'i analiz et ve yol haritasını göster
+python yol_haritasi.py ders.pdf
+
+# Birden fazla dosyayı birleştirerek analiz et
+python yol_haritasi.py ders1.pdf notlar.txt
+
+# İçerik analizi yapmadan tam konu ağacını listele
+python yol_haritasi.py --tum-konular
+
+# Yol haritasını dosyaya da kaydet
+python yol_haritasi.py ders.pdf --kaydet harita.txt
+```
+
+### PDF Yükleyici'den Doğrudan Kullanım
+
+```bash
+# pdf_yukleyici.py üzerinden harita oluştur
+python pdf_yukleyici.py ders.pdf --yol-haritasi
+```
+
+### Python Modülü Olarak Kullanım
+
+```python
+from yol_haritasi import yol_haritasi_olustur, yol_haritasi_yazdir
+
+# PDF dosyasından harita oluştur
+harita = yol_haritasi_olustur(dosyalar=["ders.pdf"])
+yol_haritasi_yazdir(harita)
+
+# Ham metin üzerinden harita oluştur
+metin = "Newton-Raphson kök bulma. Gauss eliminasyonu. Simpson integrali."
+harita = yol_haritasi_olustur(metin=metin)
+yol_haritasi_yazdir(harita)
+
+# Tüm konu ağacını haritala (içerik bağımsız)
+harita = yol_haritasi_olustur(tum_konular=True)
+yol_haritasi_yazdir(harita, dosyaya="harita.txt")
+```
+
+### Örnek Çıktı
+
+```
+====================================================================
+  📚 ÇALIŞMA YOL HARİTASI — Nümerik Analiz
+====================================================================
+  Tespit edilen konu sayısı : 5
+  Toplam tahmini süre       : ~25 saat
+====================================================================
+
+  ────────────────────────────────────────────────────────────────
+  Adım  1  |  Hata Analizi
+  ────────────────────────────────────────────────────────────────
+  Zorluk   : ★☆☆☆
+  Süre     : ~3 saat
+  İçerikte : 3 anahtar kelime eşleşmesi
+
+    Sayısal yöntemlerin temel taşı. Mutlak/bağıl hata, yuvarlama
+    ve kesme hatalarını kavramak her konudan önce gelir.
+  ...
+====================================================================
+  ✅ Haritadaki sırayla çalışarak ~25 saatte tüm
+     konuları tamamlayabilirsin. Başarılar! 🎓
+====================================================================
+```
+
+---
+
 ## 📊 Yöntem Karşılaştırması (f(x) = x³ − x − 2 = 0)
 
 | Yöntem | İterasyon | Yaklaşık Kök | Hata |
@@ -208,7 +285,7 @@ pdf_kaydet("ders.pdf", "ders_metni.txt")
 ## 🧪 Test Sonuçları
 
 ```
-49 passed in 0.57s
+69 passed in 0.55s
 ```
 
 Tüm yöntemler, analitik çözümler ile karşılaştırılarak birim testlerle doğrulanmıştır.
