@@ -4,7 +4,11 @@ Birim Testleri (Unit Tests)
 Gazi Üniversitesi Nümerik Analiz Sınavı Yardımcısı
 """
 
+import io
 import math
+import os
+import tempfile
+
 import pytest
 import numpy as np
 
@@ -249,3 +253,203 @@ class TestOzedeger:
         lam, _ = ters_guc_iterasyonu(self.A, verbose=False)
         numpy_lam = sorted(np.linalg.eigvals(self.A).real)
         assert abs(lam - min(numpy_lam)) < TOL
+
+
+# ===========================================================================
+# PDF YÜKLEYİCİ
+# ===========================================================================
+
+def _ornek_pdf_olustur(sayfa_metinleri: list[str]) -> str:
+    """
+    Test için basit çok sayfalı bir PDF dosyası oluşturur ve geçici yolunu döndürür.
+    pypdf ile doğrudan okunabilen geçerli bir PDF yapısı üretir.
+    """
+    import io as _io
+
+    buf = _io.BytesIO()
+    buf.write(b"%PDF-1.4\n")
+
+    katalog_id = 1
+    sayfalar_id = 2
+    font_id = 3
+    ilk_sayfa_id = 4          # sayfa nesneleri buradan başlar
+    ilk_icerik_id = ilk_sayfa_id + len(sayfa_metinleri)  # içerik akışları
+
+    toplam_nesne = ilk_icerik_id + len(sayfa_metinleri)  # 1 tabanlı; xref Size = toplam_nesne
+
+    offset_tablosu: dict[int, int] = {}
+
+    def nesne_yaz(nesne_id: int, icerik: bytes) -> None:
+        offset_tablosu[nesne_id] = buf.tell()
+        buf.write(f"{nesne_id} 0 obj\n".encode())
+        buf.write(icerik)
+        buf.write(b"\nendobj\n")
+
+    # Font nesnesi
+    nesne_yaz(font_id, b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
+
+    # İçerik akışları
+    for i, metin in enumerate(sayfa_metinleri):
+        guvenli = metin.replace("(", "").replace(")", "").replace("\\", "")
+        akis = f"BT /F1 12 Tf 50 700 Td ({guvenli}) Tj ET".encode("latin-1", errors="replace")
+        icerik_id = ilk_icerik_id + i
+        nesne_yaz(
+            icerik_id,
+            f"<< /Length {len(akis)} >>\nstream\n".encode() + akis + b"\nendstream",
+        )
+
+    # Sayfa nesneleri
+    for i in range(len(sayfa_metinleri)):
+        sayfa_id = ilk_sayfa_id + i
+        icerik_id = ilk_icerik_id + i
+        nesne_yaz(
+            sayfa_id,
+            (
+                f"<< /Type /Page /Parent {sayfalar_id} 0 R "
+                f"/MediaBox [0 0 612 792] "
+                f"/Contents {icerik_id} 0 R "
+                f"/Resources << /Font << /F1 {font_id} 0 R >> >> >>"
+            ).encode(),
+        )
+
+    # Pages nesnesi
+    kids = " ".join(f"{ilk_sayfa_id + i} 0 R" for i in range(len(sayfa_metinleri)))
+    nesne_yaz(
+        sayfalar_id,
+        f"<< /Type /Pages /Kids [{kids}] /Count {len(sayfa_metinleri)} >>".encode(),
+    )
+
+    # Catalog nesnesi
+    nesne_yaz(katalog_id, f"<< /Type /Catalog /Pages {sayfalar_id} 0 R >>".encode())
+
+    # Çapraz referans tablosu (xref)
+    xref_konum = buf.tell()
+    buf.write(f"xref\n0 {toplam_nesne}\n".encode())
+    buf.write(b"0000000000 65535 f \n")
+    for obj_id in range(1, toplam_nesne):
+        off = offset_tablosu.get(obj_id, 0)
+        buf.write(f"{off:010d} 00000 n \n".encode())
+
+    buf.write(
+        f"trailer\n<< /Size {toplam_nesne} /Root {katalog_id} 0 R >>\n"
+        f"startxref\n{xref_konum}\n%%EOF\n".encode()
+    )
+
+    gecici = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
+    gecici.write(buf.getvalue())
+    gecici.close()
+    return gecici.name
+
+
+class TestPdfYukleyici:
+    """pdf_yukleyici modülünün birim testleri."""
+
+    SAYFALAR = [
+        "Newton-Raphson yontemi ile kok bulma",
+        "Bisection yontemi ornekleri",
+        "Sayisal analiz ders notlari",
+    ]
+
+    @pytest.fixture(autouse=True)
+    def pdf_dosyasi(self, tmp_path):
+        """Her test için geçici PDF ve .txt çıktı yollarını hazırlar."""
+        self.pdf_yolu = _ornek_pdf_olustur(self.SAYFALAR)
+        self.txt_yolu = str(tmp_path / "cikti.txt")
+        yield
+        # Temizlik
+        if os.path.exists(self.pdf_yolu):
+            os.unlink(self.pdf_yolu)
+
+    # --- pdf_bilgi ---
+
+    def test_bilgi_sayfa_sayisi(self):
+        from pdf_yukleyici import pdf_bilgi
+        bilgi = pdf_bilgi(self.pdf_yolu)
+        assert bilgi["sayfa_sayisi"] == len(self.SAYFALAR)
+
+    def test_bilgi_boyut(self):
+        from pdf_yukleyici import pdf_bilgi
+        bilgi = pdf_bilgi(self.pdf_yolu)
+        assert bilgi["boyut_mb"] > 0
+
+    # --- pdf_yukle ---
+
+    def test_yukle_sayfa_sayisi(self):
+        from pdf_yukleyici import pdf_yukle
+        sayfalar = pdf_yukle(self.pdf_yolu, verbose=False)
+        assert len(sayfalar) == len(self.SAYFALAR)
+
+    def test_yukle_ilk_sayfa_icerik(self):
+        from pdf_yukleyici import pdf_yukle
+        sayfalar = pdf_yukle(self.pdf_yolu, verbose=False)
+        assert "Newton" in sayfalar[0]
+
+    def test_yukle_liste_donduruyor(self):
+        from pdf_yukleyici import pdf_yukle
+        sonuc = pdf_yukle(self.pdf_yolu, verbose=False)
+        assert isinstance(sonuc, list)
+        assert all(isinstance(s, str) for s in sonuc)
+
+    # --- pdf_sayfa_getir ---
+
+    def test_sayfa_getir_gecerli(self):
+        from pdf_yukleyici import pdf_sayfa_getir
+        metin = pdf_sayfa_getir(self.pdf_yolu, 2)
+        assert "Bisection" in metin
+
+    def test_sayfa_getir_sinir_disi(self):
+        from pdf_yukleyici import pdf_sayfa_getir
+        with pytest.raises(IndexError):
+            pdf_sayfa_getir(self.pdf_yolu, 999)
+
+    def test_sayfa_getir_sifir(self):
+        from pdf_yukleyici import pdf_sayfa_getir
+        with pytest.raises(IndexError):
+            pdf_sayfa_getir(self.pdf_yolu, 0)
+
+    # --- pdf_ara ---
+
+    def test_ara_bulunan(self):
+        from pdf_yukleyici import pdf_ara
+        sonuc = pdf_ara(self.pdf_yolu, "Newton")
+        assert 1 in sonuc
+
+    def test_ara_bulunamayan(self):
+        from pdf_yukleyici import pdf_ara
+        sonuc = pdf_ara(self.pdf_yolu, "XYZBulunamaz")
+        assert sonuc == []
+
+    def test_ara_buyuk_kucuk_duyarsiz(self):
+        from pdf_yukleyici import pdf_ara
+        kucuk = pdf_ara(self.pdf_yolu, "newton", buyuk_kucuk=False)
+        buyuk = pdf_ara(self.pdf_yolu, "Newton", buyuk_kucuk=False)
+        assert kucuk == buyuk
+
+    # --- pdf_kaydet ---
+
+    def test_kaydet_dosya_olusturuyor(self):
+        from pdf_yukleyici import pdf_kaydet
+        cikti = pdf_kaydet(self.pdf_yolu, self.txt_yolu, verbose=False)
+        assert os.path.exists(cikti)
+
+    def test_kaydet_icerik_dogru(self):
+        from pdf_yukleyici import pdf_kaydet
+        cikti = pdf_kaydet(self.pdf_yolu, self.txt_yolu, verbose=False)
+        with open(cikti, encoding="utf-8") as f:
+            icerik = f.read()
+        assert "Sayfa 1" in icerik
+        assert "Newton" in icerik
+
+    # --- Hata senaryoları ---
+
+    def test_olmayan_dosya(self):
+        from pdf_yukleyici import pdf_yukle
+        with pytest.raises(FileNotFoundError):
+            pdf_yukle("/tmp/olmayan_dosya_xyz.pdf")
+
+    def test_pdf_olmayan_uzanti(self, tmp_path):
+        from pdf_yukleyici import pdf_yukle
+        txt = tmp_path / "not_a.txt"
+        txt.write_text("içerik")
+        with pytest.raises(ValueError):
+            pdf_yukle(str(txt))

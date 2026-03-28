@@ -24,8 +24,9 @@ pip install -r requirements.txt
 | `diferansiyel_denklemler.py` | **ODE** | Euler · Heun · RK2 · RK4 · RKF45 (Adaptif) |
 | `hata_analizi.py` | **Hata Analizi** | Mutlak/Bağıl Hata · Taylor Serisi · Yuvarlama · Hata Yayılımı |
 | `ozedeger.py` | **Özdeğer** | Güç İterasyonu · Ters Güç İterasyonu · NumPy doğrulama |
+| `pdf_yukleyici.py` | **PDF Yükleyici** | Büyük PDF yükleme · Sayfa getirme · Anahtar kelime arama · Metin kaydetme |
 | `demo.py` | **Demo** | Tüm modülleri çalıştırır ve sonuçları karşılaştırır |
-| `test_numerik.py` | **Testler** | 34 birim testi (pytest) |
+| `test_numerik.py` | **Testler** | 49 birim testi (pytest) |
 
 ---
 
@@ -117,6 +118,70 @@ t, y = rk4(f, t0=0, y0=1, h=0.1, t_son=1.0)
 
 ---
 
+## 📄 PDF Yükleyici (`pdf_yukleyici.py`)
+
+Büyük boyutlu ders PDF'lerini **sayfa sayfa** (akış tabanlı) işleyerek
+belleği verimli kullanır. Dosya tamamı birden belleğe yüklenmez.
+
+### Kurulum
+
+```bash
+pip install -r requirements.txt   # pypdf>=6.9.2 dahildir
+```
+
+### Komut Satırı (CLI) Kullanımı
+
+```bash
+# PDF bilgilerini görüntüle (sayfa sayısı, boyut, üst veri)
+python pdf_yukleyici.py ders.pdf --bilgi
+
+# Tüm PDF'i yükle ve ilk sayfayı önizle
+python pdf_yukleyici.py ders.pdf
+
+# Yalnızca 3. sayfayı göster
+python pdf_yukleyici.py ders.pdf --sayfa 3
+
+# Anahtar kelime ara (hangi sayfalarda geçiyor?)
+python pdf_yukleyici.py ders.pdf --ara Newton
+
+# PDF metnini .txt dosyasına aktar
+python pdf_yukleyici.py ders.pdf --kaydet
+```
+
+### Python Modülü Olarak Kullanım
+
+```python
+from pdf_yukleyici import pdf_yukle, pdf_sayfa_getir, pdf_ara, pdf_bilgi, pdf_kaydet
+
+# Büyük PDF'i sayfa sayfa yükle (bellek dostu)
+sayfalar = pdf_yukle("ders.pdf")          # list[str]
+print(sayfalar[0])                         # İlk sayfa metni
+
+# Yalnızca belirli bir sayfayı oku
+metin = pdf_sayfa_getir("ders.pdf", 5)    # 5. sayfa
+
+# İçinde anahtar kelime ara
+sayfalar = pdf_ara("ders.pdf", "Newton")  # [3, 7, 12]
+
+# Dosya bilgisi
+bilgi = pdf_bilgi("ders.pdf")
+print(bilgi["sayfa_sayisi"], bilgi["boyut_mb"])
+
+# Tüm metni .txt dosyasına kaydet
+pdf_kaydet("ders.pdf", "ders_metni.txt")
+```
+
+### Büyük Dosyalar için İpuçları
+
+| Durum | Öneri |
+|---|---|
+| Tek sayfa yeterli | `pdf_sayfa_getir()` kullanın – yalnızca o sayfa okunur |
+| İçerik arama | `pdf_ara()` kullanın – tam metin belleğe alınmaz |
+| Tüm metin gerekli | `pdf_yukle()` sayfa listesi döndürür; `sayfalar[i]` ile erişin |
+| Dosyayı saklamak | `pdf_kaydet()` ile .txt'ye aktarın, ardından PDF'i silebilirsiniz |
+
+---
+
 ## 📊 Yöntem Karşılaştırması (f(x) = x³ − x − 2 = 0)
 
 | Yöntem | İterasyon | Yaklaşık Kök | Hata |
@@ -143,7 +208,7 @@ t, y = rk4(f, t0=0, y0=1, h=0.1, t_son=1.0)
 ## 🧪 Test Sonuçları
 
 ```
-34 passed in 0.50s
+49 passed in 0.57s
 ```
 
 Tüm yöntemler, analitik çözümler ile karşılaştırılarak birim testlerle doğrulanmıştır.
