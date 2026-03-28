@@ -249,6 +249,5 @@ if __name__ == "__main__":
         ["Bileşik Simpson n=4",  y5, abs(y5 - gercek)],
         ["Gauss-Legendre 3 pt",  y6, abs(y6 - gercek)],
     ]
-    from tabulate import tabulate
     print(tabulate(ozet, headers=["Yöntem", "Yaklaşık", "Mutlak Hata"],
                    floatfmt=".10f", tablefmt="grid"))

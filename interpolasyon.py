@@ -228,7 +228,7 @@ def newton_geri(x_noktalari, y_noktalari, x_sorgu, verbose=True):
 
 
 # ---------------------------------------------------------------------------
-# 5. DOĞAL KÜPSEl SPLINE
+# 5. DOĞAL KÜBİK SPLINE
 # ---------------------------------------------------------------------------
 
 def kubik_spline(x_noktalari, y_noktalari, x_sorgu, verbose=True):
@@ -244,7 +244,7 @@ def kubik_spline(x_noktalari, y_noktalari, x_sorgu, verbose=True):
     deger = float(cs(x_sorgu))
 
     if verbose:
-        print("\n=== DOĞAL KÜPSEl SPLINE ===")
+        print("\n=== DOĞAL KÜBİK SPLINE ===")
         print(f"S({x_sorgu}) = {deger:.8f}")
 
     return deger
